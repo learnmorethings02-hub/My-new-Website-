@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aborvaa's Memory Gallery</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Poppins', sans-serif; }
+        .sketch-filter {
+            filter: grayscale(100%) contrast(150%) brightness(110%);
+            transition: filter 0.5s ease-in-out;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0px) scale(1); opacity: 1; }
+            100% { transform: translateY(-120px) scale(1.5); opacity: 0; }
+        }
+        .floating-emoji {
+            position: absolute;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+            font-size: 24px;
+            z-index: 60;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-16">
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex justify-between items-center">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Memory Gallery</h1>
+        <div class="flex gap-2">
+            <button onclick="switchTab('all')" id="btn-all" class="px-3 py-1.5 text-sm font-medium rounded-full bg-violet-600 text-white transition">All</button>
+            <button onclick="switchTab('favorites')" id="btn-fav" class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-800 text-slate-300 transition">Favorites (<span id="fav-count">0</span>)</button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-md mx-auto p-4">
+        <div id="gallery-container" class="flex flex-col gap-6">
+            <!-- Dynamic Cards will load here -->
+        </div>
+    </main>
+
+    <!-- Modal for Detailed View -->
+    <div id="detail-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg hidden flex flex-col justify-between p-4 overflow-y-auto">
+        <div class="flex justify-between items-center py-2">
+            <h2 id="modal-title" class="text-lg font-semibold text-violet-400">Memory Details</h2>
+            <button onclick="closeModal()" class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-300">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="my-auto flex flex-col items-center">
+            <div class="relative w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900">
+                <img id="modal-img" src="" alt="Memory" class="w-full h-80 object-cover">
+                <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1 rounded-full text-xs text-white backdrop-blur-sm">
+                    <span id="modal-mode-tag">Real Photo</span>
+                </div>
+            </div>
+
+            <!-- Reactions Bar -->
+            <div class="flex gap-4 my-6 relative">
+                <button onclick="triggerEmoji('❤', event)" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 text-xl flex items-center justify-center shadow-lg transition">❤️</button>
+                <button onclick="triggerEmoji('🔥', event)" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 text-xl flex items-center justify-center shadow-lg transition">🔥</button>
+                <button onclick="triggerEmoji('👏', event)" class="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 text-xl flex items-center justify-center shadow-lg transition">👏</button>
+            </div>
+        </div>
+
+        <div class="py-2 text-center text-xs text-slate-500">Double tap image in gallery to switch style</div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        const memories = [
+            {
+                id: 1,
+                title: "Flower Drawing Memory",
+                realImg: "1000114853.jpg",      // Source 1
+                drawingImg: "1000114846.jpg",    // Source 2
+                isSketch: false
+            },
+            {
+                id: 2,
+                title: "Nature Landscape Memory",
+                realImg: "1000114860.jpg",      // Source 3
+                drawingImg: "1000114850.jpg",    // Source 4
+                isSketch: false
+            },
+            {
+                id: 3,
+                title: "Cute Bunny Memory",
+                realImg: "1000114854.jpg",      // Source 5
+                drawingImg: "1000114841.jpg",    // Source 6
+                isSketch: false
+            }
+        ];
+
+        let currentTab = 'all';
+        let favorites = JSON.parse(localStorage.getItem('fav_memories')) || [];
+
+        function renderGallery() {
+            const container = document.getElementById('gallery-container');
+            container.innerHTML = '';
+
+            let filteredMemories = memories;
+            if (currentTab === 'favorites') {
+                filteredMemories = memories.filter(m => favorites.includes(m.id));
+            }
+
+            if (filteredMemories.length === 0) {
+                container.innerHTML = `<div class="text-center py-20 text-slate-500 text-sm">No memories found here.</div>`;
+                return;
+            }
+
+            filteredMemories.forEach(mem => {
+                const isFav = favorites.includes(mem.id);
+                const activeImg = mem.isSketch ? mem.drawingImg : mem.realImg;
+
+                const card = document.createElement('div');
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg relative group";
+                card.innerHTML = `
+                    <div class="relative overflow-hidden aspect-square cursor-pointer" ondblclick="toggleSketch(${mem.id})">
+                        <img src="${activeImg}" alt="${mem.title}" class="w-full h-full object-cover transition duration-300 ${mem.isSketch ? 'sketch-filter' : ''}">
+                        <div class="absolute top-3 left-3 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] text-white font-medium">
+                            ${mem.isSketch ? '✏️️ Sketch Mode' : '📸 Real Photo'} (Double tap)
+                        </div>
+                    </div>
+                    <div class="p-4 flex flex-col gap-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-semibold text-slate-100">${mem.title}</h3>
+                            <button onclick="toggleFavorite(${mem.id})" class="text-xl transition transform active:scale-125">
+                                <i class="${isFav ? 'fa-solid fa-heart text-pink-500' : 'fa-regular fa-heart text-slate-400'}"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                            <button onclick="openModal(${mem.id})" class="flex-1 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-medium py-2 rounded-xl transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-eye text-[10px]"></i> View Full
+                            </button>
+                            <button onclick="shareMemory('${mem.title}', '${activeImg}')" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-xs">
+                                <i class="fa-solid fa-share-nodes"></i>
+                            </button>
+                            <a href="${activeImg}" download="memory_${mem.id}.jpg" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-xs">
+                                <i class="fa-solid fa-download"></i>
+                            </a>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            document.getElementById('fav-count').innerText = favorites.length;
+        }
+
+        function toggleSketch(id) {
+            const mem = memories.find(m => m.id === id);
+            if (mem) {
+                mem.isSketch = !mem.isSketch;
+                renderGallery();
+            }
+        }
+
+        function toggleFavorite(id) {
+            if (favorites.includes(id)) {
+                favorites = favorites.filter(favId => favId !== id);
+            } else {
+                favorites.push(id);
+            }
+            localStorage.setItem('fav_memories', JSON.stringify(favorites));
+            renderGallery();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            if (tab === 'all') {
+                document.getElementById('btn-all').className = "px-3 py-1.5 text-sm font-medium rounded-full bg-violet-600 text-white transition";
+                document.getElementById('btn-fav').className = "px-3 py-1.5 text-sm font-medium rounded-full bg-slate-800 text-slate-300 transition";
+            } else {
+                document.getElementById('btn-fav').className = "px-3 py-1.5 text-sm font-medium rounded-full bg-violet-600 text-white transition";
+                document.getElementById('btn-all').className = "px-3 py-1.5 text-sm font-medium rounded-full bg-slate-800 text-slate-300 transition";
+            }
+            renderGallery();
+        }
+
+        function openModal(id) {
+            const mem = memories.find(m => m.id === id);
+            if (!mem) return;
+
+            document.getElementById('modal-title').innerText = mem.title;
+            document.getElementById('modal-img').src = mem.isSketch ? mem.drawingImg : mem.realImg;
+            document.getElementById('modal-img').className = `w-full h-80 object-cover ${mem.isSketch ? 'sketch-filter' : ''}`;
+            document.getElementById('modal-mode-tag').innerText = mem.isSketch ? '✏️ Sketch Mode' : '📸 Real Photo';
+
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+        }
+
+        function shareMemory(title, url) {
+            if (navigator.share) {
+                navigator.share({ title: title, text: 'Check out this memory!', url: url }).catch(console.log);
+            } else {
+                alert('Link copied to clipboard!');
+            }
+        }
+
+        function triggerEmoji(emojiChar, event) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const emoji = document.createElement('div');
+            emoji.className = 'floating-emoji';
+            emoji.innerText = emojiChar;
+            emoji.style.left = (rect.left + rect.width / 2) + 'px';
+            emoji.style.top = rect.top + 'px';
+            document.body.appendChild(emoji);
+
+            setTimeout(() => emoji.remove(), 1000);
+        }
+
+        renderGallery();
+    </script>
+</body>
+</html>
